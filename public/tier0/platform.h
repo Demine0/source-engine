@@ -8,6 +8,7 @@
 
 #ifndef PLATFORM_H
 #define PLATFORM_H
+#include <mach/mach_time.h>
 
 #if defined(__x86_64__) || defined(_WIN64) || defined(__aarch64__)
 #define PLATFORM_64BITS 1
@@ -464,7 +465,7 @@ typedef void * HINSTANCE;
 #   define DebuggerBreak()  raise(SIGTRAP)
 #  endif
 # else
-#  define DebuggerBreak()  do { if ( Plat_IsInDebugSession() ) { __asm ( "int $3" ); } else { raise(SIGTRAP); } } while(0)
+#  define DebuggerBreak()  do { if ( Plat_IsInDebugSession() ) { __asm ( "trap" ); } else { raise(SIGTRAP); } } while(0)
 # endif
 #else
 # define DebuggerBreak()  raise(SIGTRAP)
@@ -581,9 +582,10 @@ typedef void * HINSTANCE;
 
 // Linux had a few areas where it didn't construct objects in the same order that Windows does.
 // So when CVProfile::CVProfile() would access g_pMemAlloc, it would crash because the allocator wasn't initalized yet.
-#ifdef POSIX
+/*#ifdef POSIX
 	#define CONSTRUCT_EARLY __attribute__((init_priority(101)))
-#else
+*/
+#ifdef POSIX
 	#define CONSTRUCT_EARLY
 	#endif
 
@@ -779,7 +781,6 @@ typedef void * HINSTANCE;
 
 #ifdef OSX
 #pragma GCC diagnostic ignored "-Wconversion-null"			// passing NULL to non-pointer argument 1
-#pragma GCC diagnostic ignored "-Wnull-arithmetic"			// NULL used in arithmetic. Ie, vpanel == NULL where VPANEL is uint.
 #pragma GCC diagnostic ignored "-Wswitch-enum"				// enumeration values not handled in switch
 #pragma GCC diagnostic ignored "-Wswitch"					// enumeration values not handled in switch
 #endif
@@ -1258,6 +1259,8 @@ inline uint64 Plat_Rdtsc()
 	uint32 lo, hi;
 	__asm__ __volatile__ ( "rdtsc" : "=a" (lo), "=d" (hi));
 	return ( ( ( uint64 )hi ) << 32 ) | lo;
+#elif defined(__ppc__)
+    return mach_absolute_time();
 #else
 	#error
 #endif

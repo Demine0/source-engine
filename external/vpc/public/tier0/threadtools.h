@@ -38,6 +38,10 @@
 #define PTHREAD_MUTEX_ADAPTIVE_NP      3
 #endif
 
+#ifdef __ppc__
+#define __sync_bool_compare_and_swap(ptr, oldval, newval) __atomic_compare_exchange(ptr, &oldval, &newval, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
+#endif
+
 #ifdef _PS3
 #define PS3_SYS_PPU_THREAD_COMMON_STACK_SIZE ( 256 * 1024 )
 #endif

@@ -22,7 +22,9 @@ bool Check3DNowTechnology(void) { return false; }
 
 static void cpuid(uint32 function, uint32& out_eax, uint32& out_ebx, uint32& out_ecx, uint32& out_edx)
 {
-#if defined(PLATFORM_64BITS)
+#if defined (__ppc__)
+	return false;
+#elif defined(PLATFORM_64BITS)
         asm("mov %%rbx, %%rsi\n\t"
                 "cpuid\n\t"
                 "xchg %%rsi, %%rbx"

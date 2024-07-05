@@ -45,6 +45,10 @@
 
 #endif
 
+#if defined (__ppc__)
+#define __sync_bool_compare_and_swap(ptr, oldval, newval) __atomic_compare_exchange(ptr, &oldval, &newval, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
+#endif
+
 #ifndef _PS3
 #include <memory.h>
 #endif
@@ -1808,7 +1812,6 @@ int64 ThreadInterlockedCompareExchange64( int64 volatile *pDest, int64 value, in
 	}
 }
 #endif
-
 bool ThreadInterlockedAssignIf64(volatile int64 *pDest, int64 value, int64 comperand ) 
 {
 	Assert( (size_t)pDest % 8 == 0 );
@@ -1852,7 +1855,6 @@ bool ThreadInterlockedAssignIf128( volatile int128 *pDest, const int128 &value, 
 	return false;
 }
 #endif
-
 #elif defined(GNUC)
 
 #ifdef OSX

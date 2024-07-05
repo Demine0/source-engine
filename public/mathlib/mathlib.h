@@ -14,12 +14,16 @@
 #include "mathlib/vector.h"
 #include "mathlib/vector2d.h"
 #include "tier0/dbg.h"
-
 #include "mathlib/math_pfns.h"
 
 #if defined(__i386__) || defined(_M_IX86)
 // For MMX intrinsics
 #include <xmmintrin.h>
+#endif
+
+#if defined(__ppc)
+// For PowerPC
+#include <altivec.h>
 #endif
 
 // XXX remove me
@@ -421,7 +425,9 @@ void inline SinCos( float radians, float *sine, float *cosine )
 	*sine = sin( radians );
 	*cosine = cos( radians );
 #elif defined( OSX )
-    __sincosf(radians, sine, cosine);
+	*sine = sin( radians );
+	*cosine = cos( radians );
+	//__sincosf(radians, sine, cosine);
 #elif defined( POSIX )
 	sincosf(radians, sine, cosine);
 #endif
@@ -1202,6 +1208,8 @@ FORCEINLINE int RoundFloatToInt(float f)
 	flResult = __fctiw( f );
 	return pResult[1];
 #elif defined (__arm__) ||  defined (__aarch64__)
+        return (int)(f + 0.5f);
+#elif defined (__ppc__)
         return (int)(f + 0.5f);
 #else
 #error Unknown architecture

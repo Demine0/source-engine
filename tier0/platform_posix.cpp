@@ -946,7 +946,7 @@ void EnableMemoryLogging( bool bOnOff )
 	if ( bOnOff )
 	{
 		InstallHooks();
-#if 0
+/*#if 0
 		// simple test
 		char *p[10];
 		for( int i =0; i < 10; i++ )
@@ -973,7 +973,7 @@ void EnableMemoryLogging( bool bOnOff )
 		free( p1 );
 		printf(" after realloc frees\n" );
 		DumpMemoryLog();
-#endif
+#endif*/
 	}
 
 	else

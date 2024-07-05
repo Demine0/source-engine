@@ -28,6 +28,9 @@
 #include "tier0/memalloc.h"
 #include "tier0/memdbgoff.h"
 
+#if defined (__ppc__)
+#define __sync_bool_compare_and_swap(ptr, oldval, newval) __atomic_compare_exchange(ptr, &oldval, &newval, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
+#endif
 #if defined( _X360 )
 #define USE_NATIVE_SLIST
 #endif
@@ -35,6 +38,7 @@
 //-----------------------------------------------------------------------------
 
 #if defined( PLATFORM_64BITS )
+
 
 #if defined (PLATFORM_WINDOWS) 
 //typedef __m128i int128;

@@ -294,7 +294,7 @@ class Android:
 		if self.is_clang() or self.is_host():
 			linkflags += ['-fuse-ld=lld']
 
-		linkflags += ['-Wl,--hash-style=both','-Wl,--no-undefined']
+		linkflags += ['-Wl,--hash-style=both']
 		return linkflags
 
 	def ldflags(self):
