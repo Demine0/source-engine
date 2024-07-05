@@ -45,10 +45,6 @@
 
 #endif
 
-#if defined (__ppc__)
-#define __sync_bool_compare_and_swap(ptr, oldval, newval) __atomic_compare_exchange(ptr, &oldval, &newval, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
-#endif
-
 #ifndef _PS3
 #include <memory.h>
 #endif

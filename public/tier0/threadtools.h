@@ -28,11 +28,6 @@
 #include <intrin.h>
 #endif
 
-#if defined (__ppc__)
-//#define __sync_val_compare_and_swap(ptr, oldval, newval) __atomic_compare_exchange(ptr, &oldval, &newval, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
-//#define __sync_bool_compare_and_swap(ptr, oldval, newval) __atomic_compare_exchange(ptr, &oldval, &newval, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
-#endif
-
 #if defined( _PS3 )
 #include <sys/ppu_thread.h>
 #include <sys/synchronization.h>
@@ -355,51 +350,13 @@ inline int64 ThreadInterlockedExchangeAdd64( int64 volatile *p, int64 value )
 	Assert( ( (size_t)p ) % 8 == 0 ); 
 	return __sync_fetch_and_add( p, value );
 }
+// need implementation for powerpc
 inline int32_t ThreadInterlockedCompareExchange(int32_t volatile *p, int32_t value, int32_t comperand) {
-    assert((size_t)p % 4 == 0);
-
-    #ifdef __ppc__
-    int32_t prev;
-    __asm__ __volatile__(
-        "1: lwarx   %0, 0, %2\n"    // Load and reserve
-        "   cmpw    %0, %3\n"       // Compare with comperand
-        "   bne-    2f\n"           // If not equal, jump to label 2
-        "   stwcx.  %1, 0, %2\n"    // Store conditional
-        "   bne-    1b\n"           // If store failed, retry
-        "2:"
-        : "=&r" (prev)
-        : "r" (value), "r" (p), "r" (comperand)
-        : "cc", "memory"
-    );
-    return prev;
-    #else
-    return __sync_val_compare_and_swap(p, comperand, value);
-    #endif
-}
-/*inline int32 ThreadInterlockedCompareExchange( int32 volatile *p, int32 value, int32 comperand )
 {
-  Assert( (size_t)p % 4 == 0 );
-
-  #ifdef __ppc__
-  int32 *result;
-__asm__ __volatile__(
-        "1: lwarx %0,0,%1\n"
-        "   addic %0,%0,1\n"
-        "   stwcx. %0,0,%1\n"
-        "   bne- 1b"
-        : "=&r" (result)
-        : "r" (p)
-        : "cc", "memory"
-    );
-  return result;
-  #else
-  return __sync_val_compare_and_swap( p, comperand, value );
-  #endif
-}*/
-/*{
 	Assert( (size_t)p % 4 == 0 );
 	return __sync_val_compare_and_swap( p, comperand, value );
-}*/
+}
+// need implementation for powerpc
 inline bool ThreadInterlockedAssignIf( int32 volatile *p, int32 value, int32 comperand )
 {
 	Assert( (size_t)p % 4 == 0 );
