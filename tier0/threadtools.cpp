@@ -1880,7 +1880,11 @@ long ThreadInterlockedExchangeAdd( long volatile *pDest, long value )
 
 long ThreadInterlockedCompareExchange( long volatile *pDest, long value, long comperand )
 {
-	return  __sync_val_compare_and_swap( pDest, comperand, value );
+	//return __sync_val_compare_and_swap( pDest, comperand, value  );
+	bool success = OSAtomicCompareAndSwap64Barrier(value, comperand, pDest);
+    if (success) return value;
+    type tmp = *ptr;
+    if (tmp != oldval) return tmp;
 }
 
 bool ThreadInterlockedAssignIf( long volatile *pDest, long value, long comperand )
@@ -1893,7 +1897,12 @@ bool ThreadInterlockedAssignIf( long volatile *pDest, long value, long comperand
 
 void *ThreadInterlockedCompareExchangePointer( void *volatile *pDest, void *value, void *comperand )
 {	
-	return  __sync_val_compare_and_swap( pDest, comperand, value );
+	//return __sync_val_compare_and_swap( pDest, comperand, value  );
+	bool success = OSAtomicCompareAndSwap64Barrier(value, comperand, pDest);
+    if (success) return value;
+    type tmp = *ptr;
+    if (tmp != oldval) return tmp;
+
 }
 
 bool ThreadInterlockedAssignPointerIf( void * volatile *pDest, void *value, void *comperand )
