@@ -350,13 +350,11 @@ inline int64 ThreadInterlockedExchangeAdd64( int64 volatile *p, int64 value )
 	Assert( ( (size_t)p ) % 8 == 0 ); 
 	return __sync_fetch_and_add( p, value );
 }
-// need implementation for powerpc
-inline int32_t ThreadInterlockedCompareExchange(int32_t volatile *p, int32_t value, int32_t comperand) {
+inline int32_t ThreadInterlockedCompareExchange(int32_t volatile *p, int32_t value, int32_t comperand)
 {
 	Assert( (size_t)p % 4 == 0 );
 	return __sync_val_compare_and_swap( p, comperand, value );
 }
-// need implementation for powerpc
 inline bool ThreadInterlockedAssignIf( int32 volatile *p, int32 value, int32 comperand )
 {
 	Assert( (size_t)p % 4 == 0 );
