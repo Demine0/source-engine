@@ -1885,7 +1885,8 @@ long ThreadInterlockedCompareExchange( long volatile *pDest, long value, long co
 
 bool ThreadInterlockedAssignIf( long volatile *pDest, long value, long comperand )
 {
-	return __sync_bool_compare_and_swap( pDest, comperand, value );
+	//return __sync_bool_compare_and_swap( pDest, comperand, value );
+	return OSAtomicCompareAndSwap64(value, comperand, pDest);
 }
 
 #if !defined( USE_INTRINSIC_INTERLOCKED ) 
@@ -1897,7 +1898,8 @@ void *ThreadInterlockedCompareExchangePointer( void *volatile *pDest, void *valu
 
 bool ThreadInterlockedAssignPointerIf( void * volatile *pDest, void *value, void *comperand )
 {
-	return  __sync_bool_compare_and_swap( pDest, comperand, value );
+	//return  __sync_bool_compare_and_swap( pDest, comperand, value );
+	return OSAtomicCompareAndSwap64(value, comperand, pDest);
 }
 
 #elif defined( PLATFORM_64BITS )
@@ -1914,12 +1916,17 @@ void *ThreadInterlockedCompareExchangePointer( void * volatile *p, void *value, 
 
 int64 ThreadInterlockedCompareExchange64( int64 volatile *pDest, int64 value, int64 comperand )
 {
-	return __sync_val_compare_and_swap( pDest, comperand, value  );
+	//return __sync_val_compare_and_swap( pDest, comperand, value  );
+	bool success = OSAtomicCompareAndSwap64Barrier(value, comperand, pDest);
+    if (success) return value;
+    type tmp = *ptr;
+    if (tmp != oldval) return tmp;
 }
 
 bool ThreadInterlockedAssignIf64( int64 volatile * pDest, int64 value, int64 comperand ) 
 {
-	return __sync_bool_compare_and_swap( pDest, comperand, value );
+	//return __sync_bool_compare_and_swap( pDest, comperand, value );
+	return OSAtomicCompareAndSwap64(value, comperand, pDest);
 }
 
 
