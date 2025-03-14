@@ -49,13 +49,50 @@ typedef __int128_t int128;
 #define TSLIST_NODE_ALIGNMENT 16
 
 #ifdef POSIX
-inline bool ThreadInterlockedAssignIf128( int128 volatile * pDest, const int128 &value, const int128 &comparand ) 
+struct int128 {
+    uint64_t high;
+    uint64_t low;
+};
+
+inline bool ThreadInterlockedAssignIf128(int128 volatile *pDest, const int128 &value, const int128 &comparand) {
+    assert((reinterpret_cast<uintptr_t>(pDest) % 16) == 0);
+
+    #ifdef __ppc__
+    int success;
+
+    __asm__ __volatile__(
+        "1: lwarx   %%r0, 0, %1\n"     // Load and reserve low part
+        "   ldarx   %%r1, 8, %1\n"     // Load and reserve high part
+        "   cmpw    %%r0, %2\n"        // Compare low part
+        "   bne-    2f\n"              // If not equal, jump to label 2
+        "   cmpw    %%r1, %3\n"        // Compare high part
+        "   bne-    2f\n"              // If not equal, jump to label 2
+        "   stwcx.  %4, 0, %1\n"       // Store low part conditional
+        "   bne-    1b\n"              // If store failed, retry
+        "   stdcx.  %5, 8, %1\n"       // Store high part conditional
+        "   bne-    1b\n"              // If store failed, retry
+        "   li      %0, 1\n"           // Set success to 1
+        "   b       3f\n"              // Jump to end
+        "2: li      %0, 0\n"           // Set success to 0
+        "3:"
+        : "=&r" (success)
+        : "r" (pDest), "r" (comparand.low), "r" (comparand.high), "r" (value.low), "r" (value.high)
+        : "cc", "memory", "r0", "r1"
+    );
+
+    return success;
+    #else
+    int128 local_comparand = comparand;
+    return __sync_bool_compare_and_swap(pDest, local_comparand, value);
+    #endif
+}
+/*inline bool ThreadInterlockedAssignIf128( int128 volatile * pDest, const int128 &value, const int128 &comparand ) 
 {
     // We do not want the original comparand modified by the swap
     // so operate on a local copy.
     int128 local_comparand = comparand;
 	return __sync_bool_compare_and_swap( pDest, local_comparand, value );
-}
+}*/
 #endif
 
 inline bool ThreadInterlockedAssignIf64x128( volatile int128 *pDest, const int128 &value, const int128 &comperand )
@@ -65,10 +102,41 @@ inline bool ThreadInterlockedAssignIf64x128( volatile int128 *pDest, const int12
 #else
 #define TSLIST_HEAD_ALIGNMENT 8
 #define TSLIST_NODE_ALIGNMENT 8
-inline bool ThreadInterlockedAssignIf64x128( volatile int64 *pDest, const int64 value, const int64 comperand )
+inline bool ThreadInterlockedAssignIf64x128(volatile int64_t *pDest, const int64_t value, const int64_t comperand) {
+    assert((reinterpret_cast<uintptr_t>(pDest) % 16) == 0);
+
+    #ifdef __ppc__
+    int64_t prev_lo, prev_hi;
+    int success;
+
+    __asm__ __volatile__(
+        "1: lwarx   %0, 0, %3\n"    // Load low part and reserve
+//        "   lwzx    %1, %3, 8\n"    // Load high part
+        "   cmpw    %0, %4\n"       // Compare low part
+        "   bne-    2f\n"           // If not equal, jump to label 2
+        "   cmpw    %1, %5\n"       // Compare high part
+        "   bne-    2f\n"           // If not equal, jump to label 2
+        "   stwcx.  %6, 0, %3\n"    // Store low part conditional
+        "   bne-    1b\n"           // If store failed, retry
+        "   stw     %7, 8(%3)\n"    // Store high part
+        "   li      %2, 1\n"        // Set success to 1
+        "   b       3f\n"           // Jump to end
+        "2: li      %2, 0\n"        // Set success to 0
+        "3:"
+        : "=&r" (prev_lo), "=&r" (prev_hi), "=&r" (success)
+        : "r" (pDest), "r" (comperand & 0xFFFFFFFF), "r" (comperand >> 32), "r" (value & 0xFFFFFFFF), "r" (value >> 32)
+        : "cc", "memory"
+    );
+
+    return success;
+    #else
+    return __sync_bool_compare_and_swap(reinterpret_cast<__int128_t *>(pDest), *reinterpret_cast<const __int128_t *>(&comperand), *reinterpret_cast<const __int128_t *>(&value));
+    #endif
+}
+/*inline bool ThreadInterlockedAssignIf64x128( volatile int64 *pDest, const int64 value, const int64 comperand )
 {
 	return ThreadInterlockedAssignIf64( pDest, value, comperand );
-}
+}*/
 #endif
 
 #ifdef _MSC_VER

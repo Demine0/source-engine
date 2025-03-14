@@ -350,16 +350,68 @@ inline int64 ThreadInterlockedExchangeAdd64( int64 volatile *p, int64 value )
 	Assert( ( (size_t)p ) % 8 == 0 ); 
 	return __sync_fetch_and_add( p, value );
 }
-inline int32_t ThreadInterlockedCompareExchange(int32_t volatile *p, int32_t value, int32_t comperand)
+// need implementation for powerpc
+inline int32_t ThreadInterlockedCompareExchange(int32_t volatile *p, int32_t value, int32_t comperand) {
+    assert((size_t)p % 4 == 0);
+
+    #ifdef __ppc__
+    int32_t prev;
+
+    __asm__ __volatile__(
+        "1: lwarx   %0, 0, %2\n"    // Load and reserve
+        "   cmpw    %0, %3\n"       // Compare with comperand
+        "   bne-    2f\n"           // If not equal, jump to label 2
+        "   stwcx.  %1, 0, %2\n"    // Store conditional
+        "   bne-    1b\n"           // If store failed, retry
+        "2:"
+        : "=&r" (prev)
+        : "r" (value), "r" (p), "r" (comperand)
+        : "cc", "memory"
+    );
+
+    return prev;
+    #else
+    return __sync_val_compare_and_swap(p, comperand, value);
+    #endif
+}
+/*inline int32_t ThreadInterlockedCompareExchange(int32_t volatile *p, int32_t value, int32_t comperand) {
 {
 	Assert( (size_t)p % 4 == 0 );
 	return __sync_val_compare_and_swap( p, comperand, value );
+}*/
+// need implementation for powerpc
+inline bool ThreadInterlockedAssignIf(int32_t volatile *p, int32_t value, int32_t comperand) {
+    assert((size_t)p % 4 == 0);
+
+    #ifdef __ppc__
+    int32_t prev;
+    int success;
+
+    __asm__ __volatile__(
+        "1: lwarx   %0, 0, %2\n"    // Load and reserve
+        "   cmpw    %0, %3\n"       // Compare with comperand
+        "   bne-    2f\n"           // If not equal, jump to label 2
+        "   stwcx.  %1, 0, %2\n"    // Store conditional
+        "   bne-    1b\n"           // If store failed, retry
+        "   li      %0, 1\n"        // Set success to 1
+        "   b       3f\n"           // Jump to end
+        "2: li      %0, 0\n"        // Set success to 0
+        "3:"
+        : "=&r" (success)
+        : "r" (value), "r" (p), "r" (comperand)
+        : "cc", "memory"
+    );
+
+    return success;
+    #else
+    return __sync_bool_compare_and_swap(p, comperand, value);
+    #endif
 }
-inline bool ThreadInterlockedAssignIf( int32 volatile *p, int32 value, int32 comperand )
+/*inline bool ThreadInterlockedAssignIf( int32 volatile *p, int32 value, int32 comperand )
 {
 	Assert( (size_t)p % 4 == 0 );
 	return __sync_bool_compare_and_swap( p, comperand, value );
-}
+}*/
 
 #elif ( defined( COMPILER_MSVC32 ) && ( _MSC_VER >= 1310 ) )
 // windows 32 implemnetation using compiler intrinsics

@@ -1877,38 +1877,79 @@ long ThreadInterlockedExchangeAdd( long volatile *pDest, long value )
 {
 	return  __sync_fetch_and_add( pDest, value );
 }
+//powerpc implemertation needs
+inline long ThreadInterlockedCompareExchange(long volatile *pDest, long value, long comperand) {
+    assert((size_t)pDest % 4 == 0);
 
+    #ifdef __ppc__
+    long prev;
+
+    __asm__ __volatile__(
+        "1: lwarx   %0, 0, %2\n"    // Load and reserve
+        "   cmpw    %0, %3\n"       // Compare with comperand
+        "   bne-    2f\n"           // If not equal, jump to label 2
+        "   stwcx.  %1, 0, %2\n"    // Store conditional
+        "   bne-    1b\n"           // If store failed, retry
+        "2:"
+        : "=&r" (prev)
+        : "r" (value), "r" (pDest), "r" (comperand)
+        : "cc", "memory"
+    );
+
+    return prev;
+    #else
+    return __sync_val_compare_and_swap(pDest, comperand, value);
+    #endif
+}
+/*
 long ThreadInterlockedCompareExchange( long volatile *pDest, long value, long comperand )
 {
-	//return __sync_val_compare_and_swap( pDest, comperand, value  );
-	bool success = OSAtomicCompareAndSwap64Barrier(value, comperand, pDest);
-    if (success) return value;
-    type tmp = *ptr;
-    if (tmp != oldval) return tmp;
+	return  __sync_val_compare_and_swap( pDest, comperand, value );
 }
+*/
+//ppc implemetation
+inline bool ThreadInterlockedAssignIf(long volatile *pDest, long value, long comperand) {
+    assert((size_t)pDest % 4 == 0);
 
-bool ThreadInterlockedAssignIf( long volatile *pDest, long value, long comperand )
+    #ifdef __ppc__
+    long prev;
+    int success;
+
+    __asm__ __volatile__(
+        "1: lwarx   %0, 0, %2\n"    // Load and reserve
+        "   cmpw    %0, %3\n"       // Compare with comperand
+        "   bne-    2f\n"           // If not equal, jump to label 2
+        "   stwcx.  %1, 0, %2\n"    // Store conditional
+        "   bne-    1b\n"           // If store failed, retry
+        "   li      %0, 1\n"        // Set success to 1
+        "   b       3f\n"           // Jump to end
+        "2: li      %0, 0\n"        // Set success to 0
+        "3:"
+        : "=&r" (success)
+        : "r" (value), "r" (pDest), "r" (comperand)
+        : "cc", "memory"
+    );
+
+    return success;
+    #else
+    return __sync_bool_compare_and_swap(pDest, comperand, value);
+    #endif
+}
+/*bool ThreadInterlockedAssignIf( long volatile *pDest, long value, long comperand )
 {
-	//return __sync_bool_compare_and_swap( pDest, comperand, value );
-	return OSAtomicCompareAndSwap64(value, comperand, pDest);
+	return __sync_bool_compare_and_swap( pDest, comperand, value );
 }
-
+*/
 #if !defined( USE_INTRINSIC_INTERLOCKED ) 
 
 void *ThreadInterlockedCompareExchangePointer( void *volatile *pDest, void *value, void *comperand )
 {	
-	//return __sync_val_compare_and_swap( pDest, comperand, value  );
-	bool success = OSAtomicCompareAndSwap64Barrier(value, comperand, pDest);
-    if (success) return value;
-    type tmp = *ptr;
-    if (tmp != oldval) return tmp;
-
+	return  __sync_val_compare_and_swap( pDest, comperand, value );
 }
 
 bool ThreadInterlockedAssignPointerIf( void * volatile *pDest, void *value, void *comperand )
 {
-	//return  __sync_bool_compare_and_swap( pDest, comperand, value );
-	return OSAtomicCompareAndSwap64(value, comperand, pDest);
+	return  __sync_bool_compare_and_swap( pDest, comperand, value );
 }
 
 #elif defined( PLATFORM_64BITS )
@@ -1917,28 +1958,97 @@ void *ThreadInterlockedExchangePointer( void * volatile *pDest, void *value )
 {
 	return __sync_lock_test_and_set( pDest, value );
 }
-
-void *ThreadInterlockedCompareExchangePointer( void * volatile *p, void *value, void *comparand ) {
-	return (void *)( ( intp )ThreadInterlockedCompareExchange64( reinterpret_cast<intp volatile *>(p), reinterpret_cast<intp>(value), reinterpret_cast<intp>(comparand) ) );
+inline void *ThreadInterlockedCompareExchangePointer(void * volatile *p, void *value, void *comparand) {
+    return (void *)( ( intptr_t )ThreadInterlockedCompareExchange64(
+        reinterpret_cast<int64_t volatile *>(p), 
+        reinterpret_cast<int64_t>(value), 
+        reinterpret_cast<int64_t>(comparand) 
+    ));
 }
+/*void *ThreadInterlockedCompareExchangePointer( void * volatile *p, void *value, void *comparand ) {
+	return (void *)( ( intp )ThreadInterlockedCompareExchange64( reinterpret_cast<intp volatile *>(p), reinterpret_cast<intp>(value), reinterpret_cast<intp>(comparand) ) );
+}*/
 #endif
+inline int64_t ThreadInterlockedCompareExchange64(int64_t volatile *pDest, int64_t value, int64_t comperand) {
+    assert((size_t)pDest % 8 == 0);
 
-int64 ThreadInterlockedCompareExchange64( int64 volatile *pDest, int64 value, int64 comperand )
+    #ifdef __ppc__
+    int32_t prev_lo, prev_hi;
+    int32_t value_lo = static_cast<int32_t>(value);
+    int32_t value_hi = static_cast<int32_t>(value >> 32);
+    int32_t comparand_lo = static_cast<int32_t>(comperand);
+    int32_t comparand_hi = static_cast<int32_t>(comperand >> 32);
+    int success;
+
+    __asm__ __volatile__(
+        "1: lwarx   %0, 0, %4\n"    // Load low part and reserve
+        "   lwz     %1, 4(%4)\n"    // Load high part
+       	"   cmpw    %0, %5\n"       // Compare low part
+        "   bne-    2f\n"           // If not equal, jump to label 2
+        "   cmpw    %1, %6\n"       // Compare high part
+        "   bne-    2f\n"           // If not equal, jump to label 2
+        "   stwcx.  %7, 0, %4\n"    // Store low part conditional
+        "   bne-    1b\n"           // If store failed, retry
+        "   stw     %7, 4(%3)\n"    // Store high part       
+       	"   li      %2, 1\n"        // Set success to 1
+        "   b       3f\n"           // Jump to end
+        "2: li      %2, 0\n"        // Set success to 0
+        "3:"
+        : "=&r" (prev_lo), "=&r" (prev_hi), "=&r" (success)
+        : "r" (pDest), "r" (comparand_lo), "r" (comparand_hi), "r" (value_lo), "r" (value_hi)
+        : "cc", "memory"
+    );
+
+    return success ? (static_cast<int64_t>(prev_hi) << 32) | static_cast<uint32_t>(prev_lo) : comperand;
+    #else
+    return __sync_val_compare_and_swap(pDest, comperand, value);
+    #endif
+}
+inline bool ThreadInterlockedAssignIf64(int64_t volatile *pDest, int64_t value, int64_t comperand) {
+    assert((size_t)pDest % 8 == 0);
+
+    #ifdef __ppc__
+    int32_t prev_lo, prev_hi;
+    int32_t value_lo = static_cast<int32_t>(value);
+    int32_t value_hi = static_cast<int32_t>(value >> 32);
+    int32_t comparand_lo = static_cast<int32_t>(comperand);
+    int32_t comparand_hi = static_cast<int32_t>(comperand >> 32);
+    int success;
+
+    __asm__ __volatile__(
+        "1: lwarx   %0, 0, %5\n"    // Load low part and reserve
+        "   lwz     %1, 4(%5)\n"    // Load high part
+        "   cmpw    %0, %6\n"       // Compare low part
+        "   bne-    2f\n"           // If not equal, jump to label 2
+        "   cmpw    %1, %7\n"       // Compare high part
+        "   bne-    2f\n"           // If not equal, jump to label 2
+        "   stwcx.  %8, 0, %5\n"    // Store low part conditional
+        "   bne-    1b\n"           // If store failed, retry
+        "   stw     %9, 4(%5)\n"    // Store high part
+        "   li      %2, 1\n"        // Set success to 1
+        "   b       3f\n"           // Jump to end
+        "2: li      %2, 0\n"        // Set success to 0
+        "3:"
+        : "=&r" (prev_lo), "=&r" (prev_hi), "=&r" (success)
+        : "r" (pDest), "r" (comparand_lo), "r" (comparand_hi), "r" (value_lo), "r" (value_hi)
+        : "cc", "memory"
+    );
+
+    return success;
+    #else
+    return __sync_bool_compare_and_swap(pDest, comperand, value);
+    #endif
+}
+/*int64 ThreadInterlockedCompareExchange64( int64 volatile *pDest, int64 value, int64 comperand )
 {
-	//return __sync_val_compare_and_swap( pDest, comperand, value  );
-	bool success = OSAtomicCompareAndSwap64Barrier(value, comperand, pDest);
-    if (success) return value;
-    type tmp = *ptr;
-    if (tmp != oldval) return tmp;
+	return __sync_val_compare_and_swap( pDest, comperand, value  );
 }
 
 bool ThreadInterlockedAssignIf64( int64 volatile * pDest, int64 value, int64 comperand ) 
 {
-	//return __sync_bool_compare_and_swap( pDest, comperand, value );
-	return OSAtomicCompareAndSwap64(value, comperand, pDest);
+	return __sync_bool_compare_and_swap( pDest, comperand, value );
 }
-
-
+*/
 #elif defined( _PS3 )
 
 // This is defined in the header!
